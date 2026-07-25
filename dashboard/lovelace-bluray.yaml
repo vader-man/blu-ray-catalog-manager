@@ -1,0 +1,338 @@
+title: Blu-ray Library
+
+input_text:
+  movies_search:
+    name: Movies Search
+    initial: ""
+
+input_boolean:
+  sort_recent:
+    name: Sort Recent
+    initial: off
+
+views:
+
+  - title: Movie Collection
+    path: recent
+    icon: mdi:clock-fast
+    cards:
+
+      - type: entities
+        entities:
+          - entity: input_text.movies_search
+            name: Search title
+
+      - type: horizontal-stack
+        cards:
+
+          - type: custom:button-card
+            name: 4K
+            tap_action:
+              action: call-service
+              service: input_boolean.toggle
+              data:
+                entity_id: input_boolean.filter_4k
+            styles:
+              card:
+                - background: >
+                    [[[
+                      return states['input_boolean.filter_4k'].state === "on"
+                        ? "#ff9800"
+                        : "#333";
+                    ]]]
+                - color: white
+                - border-radius: 20px
+                - padding: 10px
+
+          - type: custom:button-card
+            name: BR
+            tap_action:
+              action: call-service
+              service: input_boolean.toggle
+              data:
+                entity_id: input_boolean.filter_bluray
+            styles:
+              card:
+                - background: >
+                    [[[
+                      return states['input_boolean.filter_bluray'].state === "on"
+                        ? "#2196f3"
+                        : "#333";
+                    ]]]
+                - color: white
+                - border-radius: 20px
+                - padding: 10px
+
+          - type: custom:button-card
+            name: DV
+            tap_action:
+              action: call-service
+              service: input_boolean.toggle
+              data:
+                entity_id: input_boolean.filter_dv
+            styles:
+              card:
+                - background: >
+                    [[[
+                      return states['input_boolean.filter_dv'].state === "on"
+                        ? "#e91e63"
+                        : "#333";
+                    ]]]
+                - color: white
+                - border-radius: 20px
+                - padding: 10px
+
+          - type: custom:button-card
+            name: AT
+            tap_action:
+              action: call-service
+              service: input_boolean.toggle
+              data:
+                entity_id: input_boolean.filter_da
+            styles:
+              card:
+                - background: >
+                    [[[
+                      return states['input_boolean.filter_da'].state === "on"
+                        ? "#ffeb3b"
+                        : "#333";
+                    ]]]
+                - color: black
+                - border-radius: 20px
+                - padding: 10px
+
+          - type: custom:button-card
+            name: Recent
+            tap_action:
+              action: call-service
+              service: input_boolean.toggle
+              data:
+                entity_id: input_boolean.sort_recent
+            styles:
+              card:
+                - background: >
+                    [[[
+                      return states['input_boolean.sort_recent'].state === "on"
+                        ? "#4caf50"
+                        : "#333";
+                    ]]]
+                - color: white
+                - border-radius: 20px
+                - padding: 10px
+                
+          - type: custom:button-card
+            name: Time
+            tap_action:
+              action: call-service
+              service: input_boolean.toggle
+              data:
+                entity_id: input_boolean.sort_duration
+            styles:
+              card:
+                - background: >
+                    [[[
+                      return states['input_boolean.sort_duration'].state === "on"
+                        ? "#9c27b0"
+                        : "#333";
+                    ]]]
+                - color: white
+                - border-radius: 20px
+                - padding: 10px
+
+      - type: custom:button-card
+        entity: sensor.movies_cards_rendered
+        show_name: false
+        show_icon: false
+        show_custom_fields: true
+
+        tap_action:
+          action: none
+
+        triggers_update:
+          - input_boolean.sort_recent
+          - input_boolean.filter_4k
+          - input_boolean.filter_bluray
+          - input_boolean.filter_dv
+          - input_boolean.filter_da
+          - input_text.movies_search
+          - input_boolean.sort_duration
+
+        custom_fields:
+          movies: >
+            [[[
+              let movies = entity.attributes.entities || [];
+
+              const f4k = states['input_boolean.filter_4k'].state === "on";
+              const fbr = states['input_boolean.filter_bluray'].state === "on";
+              const fdv = states['input_boolean.filter_dv'].state === "on";
+              const fda = states['input_boolean.filter_da'].state === "on";
+              const search = states['input_text.movies_search'].state.toLowerCase();
+              const recent = states['input_boolean.sort_recent'].state === "on";
+
+              if (fbr && fdv) movies = [];
+
+              else {
+                let filtered = movies.filter(id => {
+                  const m = states[id]?.attributes;
+                  if (!m) return false;
+
+                  if (f4k && m.format !== "4K") return false;
+                  if (fbr && m.format !== "Blu-ray") return false;
+                  if (fdv && !m.dv) return false;
+                  if (fda && !m.da) return false;
+
+                  if (search && !m.title.toLowerCase().includes(search)) return false;
+
+                  return true;
+                });
+
+                if (fbr && fda) {
+                  filtered = filtered.filter(id => {
+                    const m = states[id]?.attributes;
+                    return m.format === "Blu-ray" && m.da === true;
+                  });
+                  movies = filtered;
+                } else {
+                  if (filtered.length === 0) filtered = movies;
+                  movies = filtered;
+                }
+              }
+
+              const sortDuration = states['input_boolean.sort_duration'].state === "on";
+              movies.sort((a, b) => {
+                const ma = states[a]?.attributes;
+                const mb = states[b]?.attributes;
+                if (sortDuration) {
+                  const da = parseInt(ma.duration || 0);
+                  const db = parseInt(mb.duration || 0);
+                  return da - db;
+                }
+                if (recent) {
+                  const da = new Date(ma.added || 0);
+                  const db = new Date(mb.added || 0);
+                  return db - da;
+                }
+
+                return ma.title.localeCompare(mb.title);
+              });
+
+              return `
+                <div style="font-size:14px;color:#bbb;padding:8px 16px;">
+                  ${movies.length} titles
+                </div>
+
+                <div style="
+                  display:grid;
+                  grid-template-columns:repeat(4,1fr);
+                  gap:32px 40px;
+                  padding:24px;
+                ">
+                  ${
+                    movies.map(id => {
+                      const m = states[id]?.attributes;
+
+                      const formatBadge = m.format === "4K"
+                        ? `<span style="background:#ffcc00;color:#000;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:bold;">4K</span>`
+                        : `<span style="background:#0a1a3a;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:bold;">BR</span>`;
+
+                      const dvBadge = m.dv
+                        ? `<span style="background:#8a2be2;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:bold;">DV</span>`
+                        : ``;
+
+                      const atBadge = m.da
+                        ? `<span style="background:#ff7b00;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:bold;">AT</span>`
+                        : ``;
+
+                      const durationBadge = m.duration
+                        ? `<span style="
+                            position:absolute;
+                            top:10px;
+                            right:10px;
+                            background:white;
+                            color:black;
+                            padding:2px 6px;
+                            border-radius:4px;
+                            font-size:10px;
+                            font-weight:bold;
+                            opacity:0.70;
+                            z-index:20;
+                          ">${m.duration}</span>`
+                        : ``;
+
+                      return `
+                        <div style="
+                          width:100%;
+                          border-radius:20px;
+                          overflow:hidden;
+                          background:#111;
+                          box-shadow:0 8px 22px rgba(0,0,0,0.50);
+                          display:flex;
+                          flex-direction:column;
+                        ">
+                          <!-- POSTER -->
+                          <div style="position:relative;width:100%;">
+                            <div style="position:absolute;top:6px;left:10px;z-index:10;">
+                              ${formatBadge}
+                            </div>
+
+                            ${durationBadge}
+
+                            <img src="${m.poster}" style="
+                              width:100%;
+                              aspect-ratio:2/3;
+                              object-fit:cover;
+                            ">
+                          </div>
+
+                          <!-- BADGES DV/AT -->
+                          <div style="
+                            display:flex;
+                            flex-direction:row;
+                            gap:6px;
+                            padding:6px 10px 0px;
+                          ">
+                            ${dvBadge}
+                            ${atBadge}
+                          </div>
+
+                          <!-- TITLE -->
+                          <div style="
+                            padding:10px 10px 4px;
+                            text-align:center;
+                            font-size:15px;
+                            color:#fff;
+                            font-weight:500;
+                            user-select:none;
+                            line-height:1.25;
+                            min-height:80px;
+                            max-height:80px;
+                            overflow:hidden;
+                            white-space:normal;
+                            word-break:normal;
+                          ">
+                            ${m.title}
+                          </div>
+
+                          <!-- CABINET -->
+                          <div style="
+                            padding:4px 10px 12px;
+                            text-align:center;
+                            font-size:12px;
+                            color:#bbb;
+                            user-select:none;
+                            min-height:32px;
+                            max-height:32px;
+                            line-height:1.25;
+                            white-space:normal;
+                            word-break:normal;
+                          ">
+                            ${m.cabinet && m.cabinet !== "null" ? m.cabinet : "-"}
+                          </div>
+
+                        </div>
+                      `;
+                    }).join('')
+                  }
+                </div>
+              `;
+            ]]]

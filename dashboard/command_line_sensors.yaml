@@ -1,0 +1,21 @@
+# REMEMBER TO CREATE A SSH KEY IN HA CORE AND COPY IT TO THE REMOTE HOST, OTHERWISE THIS WILL NOT WORK
+
+- sensor:
+    name: bluray_library
+    unique_id: bluray_library_sensor
+    command: "/usr/bin/ssh -i /config/ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR <USER>@<IP_ADDRESS> '/usr/bin/python3 /home/vaderpi/bluray/bluray_local_sorted.py' 2>/dev/null"
+    scan_interval: 43200   # 43200 2 vez al día
+    json_attributes:
+      - titles
+      - catalog
+    value_template: "{{ value_json.count }}"
+    
+- sensor:
+    name: movies_alpha
+    unique_id: movies_alpha
+    command: "/usr/bin/ssh -i /config/ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR <USER>@<IP_ADDRESS> '/usr/bin/python3 /home/vaderpi/bluray/movies_alpha.py' 2>/dev/null"
+    scan_interval: 43200
+    json_attributes:
+      - movies
+      - catalog
+    value_template: "{{ value_json.count }}"

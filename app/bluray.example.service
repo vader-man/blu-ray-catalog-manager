@@ -1,0 +1,23 @@
+[Unit]
+Description=Blu-ray Catalog Manager (Flask Backend)
+After=network.target
+
+[Service]
+# Path to your Python executable
+ExecStart=/usr/bin/python3 /path/to/blu-ray-catalog-manager/app/app.py
+
+# Working directory of the Flask app
+WorkingDirectory=/path/to/blu-ray-catalog-manager/app
+
+# Restart policy for reliability
+Restart=always
+
+# User that will run the service (replace with your Linux user)
+User=YOUR_USER
+
+# Optional: environment variables (TMDB key, data dir, etc.)
+Environment="BLURAY_DATA_DIR=/path/to/blu-ray-catalog-manager/data"
+Environment="TMDB_API_KEY=YOUR_API_KEY_HERE"
+
+[Install]
+WantedBy=multi-user.target

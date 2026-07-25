@@ -1,0 +1,16 @@
+{
+  /*EAN*/"1111111111111": {
+    "title": "movie title",
+    "location": "LEVEL X (BLOCK Y)",
+    "dv": true,
+    "atmos": true,
+    "duration": "90"
+  },
+  "2222222222222": {
+    "title": "movie title",
+    "location": "LEVEL X (BLOCK Y)",
+    "dv": true,
+    "atmos": true,
+    "duration": "90"
+  }
+}

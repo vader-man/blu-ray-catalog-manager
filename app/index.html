@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Blu-ray Catalog Manager</title>
+
+<style>
+body { font-family: sans-serif; margin: 20px; }
+table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; }
+th { background: #f0f0f0; }
+.controls { margin-bottom: 10px; }
+.controls button { margin-right: 8px; }
+.form-block { margin-top: 20px; border: 1px solid #ccc; padding: 10px; }
+.form-row { margin-bottom: 6px; }
+label { display: inline-block; width: 80px; }
+input[type="text"] { width: 250px; }
+</style>
+</head>
+
+<body>
+
+<h1>Blu-ray Catalog Manager</h1>
+
+<!-- Top control buttons -->
+<div class="controls">
+  <button onclick="reloadData()">Reload data</button>
+  <button onclick="showAddForm()">Add Movie</button>
+  <button onclick="triggerCsvUpload()">Upload CSV</button>
+  <button onclick="exportToScripts()">Export to /bluray</button>
+  <button onclick="exportExcel()">Export to Excel</button>
+  <button onclick="toggle4kFilter()">Show only 4K</button>
+
+  <!-- Pipeline buttons -->
+  <button onclick="runTmdbResolver()">Run TMDB Resolver</button>
+  <button onclick="runMoviesAlpha()">Run Movies Alpha</button>
+</div>
+
+<!-- Hidden CSV input -->
+<input type="file" id="csv-file" style="display:none;" onchange="importCsv()">
+
+<!-- Movies table -->
+<table>
+<thead>
+<tr>
+  <th>EAN</th>
+  <th>Title</th>
+  <th>Location</th>
+  <th>DV</th>
+  <th>Atmos</th>
+  <th>Duration</th>
+</tr>
+</thead>
+<tbody id="movies-body"></tbody>
+</table>
+
+<!-- Log output panel -->
+<div class="form-block" id="log-block">
+  <h2>Script Logs</h2>
+  <pre id="log-output" style="background:#111; color:#0f0; padding:10px; height:200px; overflow:auto;"></pre>
+</div>
+
+<!-- Edit / delete form -->
+<div class="form-block" id="edit-block">
+  <h2>Edit / Delete Movie</h2>
+
+  <div class="form-row"><label>EAN:</label><input type="text" id="edit-ean" readonly></div>
+  <div class="form-row"><label>Title:</label><input type="text" id="edit-title"></div>
+  <div class="form-row"><label>Location:</label><input type="text" id="edit-location"></div>
+  <div class="form-row"><label>DV:</label><input type="checkbox" id="edit-dv"></div>
+  <div class="form-row"><label>Atmos:</label><input type="checkbox" id="edit-atmos"></div>
+  <div class="form-row"><label>Duration:</label><input type="text" id="edit-duration"></div>
+
+  <button onclick="saveEdit()">Save</button>
+  <button style="color:white; background:red;" onclick="deleteMovie()">Delete</button>
+</div>
+
+<!-- Add form -->
+<div class="form-block" id="add-block" style="display:none;">
+  <h2>Add New Movie</h2>
+
+  <div class="form-row"><label>EAN:</label><input type="text" id="add-ean"></div>
+  <div class="form-row"><label>Title:</label><input type="text" id="add-title"></div>
+  <div class="form-row"><label>Location:</label><input type="text" id="add-location"></div>
+  <div class="form-row"><label>DV:</label><input type="checkbox" id="add-dv"></div>
+  <div class="form-row"><label>Atmos:</label><input type="checkbox" id="add-atmos"></div>
+  <div class="form-row"><label>Duration:</label><input type="text" id="add-duration"></div>
+
+  <button onclick="addMovie()">Add</button>
+</div>
+
+<script>
+/* ---------------------------------------------------------
+   CLEANED VERSION — all enrich/sorted functions removed
+--------------------------------------------------------- */
+
+let currentData = {};
+let filter4k = false;
+
+/* Load all movies */
+function reloadData() {
+  fetch("/api/locations")
+    .then(r => r.json())
+    .then(data => { currentData = data; renderTable(); })
+    .catch(e => alert("Failed to load data"));
+}
+
+/* Toggle 4K filter */
+function toggle4kFilter() {
+  filter4k = !filter4k;
+  const btn = document.querySelector('button[onclick="toggle4kFilter()"]');
+  btn.textContent = filter4k ? "Show ALL" : "Show only 4K";
+  renderTable();
+}
+
+/* Render table */
+function renderTable() {
+  const tbody = document.getElementById("movies-body");
+  tbody.innerHTML = "";
+
+/*  Object.keys(currentData).forEach(ean => { */
+    Object.keys(currentData)
+      .sort((a, b) => {
+        const ta = currentData[a].title.toLowerCase();
+        const tb = currentData[b].title.toLowerCase();
+        return ta.localeCompare(tb);
+      })
+      .forEach(ean => {
+    const info = currentData[ean];
+
+    if (filter4k && !info.title.toUpperCase().includes("4K")) return;
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${ean}</td>
+      <td>${info.title || ""}</td>
+      <td class="editable-location">${info.location || ""}</td>
+      <td class="editable-dv"><input type="checkbox" ${info.dv ? "checked" : ""}></td>
+      <td class="editable-atmos"><input type="checkbox" ${info.atmos ? "checked" : ""}></td>
+      <td class="editable-duration">${info.duration || ""}</td>
+    `;
+
+    tr.onclick = ev => {
+      if (ev.target.tagName === "INPUT") return;
+      fillEditForm(ean, info);
+    };
+
+    /* Inline editing handlers */
+    tr.querySelector(".editable-location").onclick = ev => {
+      ev.stopPropagation();
+      const td = ev.target;
+      const oldValue = td.textContent;
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = oldValue;
+      input.style.width = "120px";
+      td.innerHTML = "";
+      td.appendChild(input);
+      input.focus();
+      input.onblur = () => {
+        saveInline(ean, { location: input.value });
+        td.textContent = input.value;
+      };
+      input.onkeydown = e => { if (e.key === "Enter") input.blur(); };
+    };
+
+    tr.querySelector(".editable-dv input").onclick = ev => {
+      ev.stopPropagation();
+      saveInline(ean, { dv: ev.target.checked });
+    };
+
+    tr.querySelector(".editable-atmos input").onclick = ev => {
+      ev.stopPropagation();
+      saveInline(ean, { atmos: ev.target.checked });
+    };
+
+    tr.querySelector(".editable-duration").onclick = ev => {
+      ev.stopPropagation();
+      const td = ev.target;
+      const oldValue = td.textContent;
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = oldValue;
+      input.style.width = "60px";
+      td.innerHTML = "";
+      td.appendChild(input);
+      input.focus();
+      input.onblur = () => {
+        saveInline(ean, { duration: input.value });
+        td.textContent = input.value;
+      };
+      input.onkeydown = e => { if (e.key === "Enter") input.blur(); };
+    };
+
+    tbody.appendChild(tr);
+  });
+}
+
+/* Save inline changes */
+function saveInline(ean, changes) {
+  const info = currentData[ean];
+  const payload = {
+    ean: ean,
+    title: info.title,
+    location: changes.location ?? info.location,
+    dv: changes.dv ?? info.dv,
+    atmos: changes.atmos ?? info.atmos,
+    duration: changes.duration ?? info.duration
+  };
+
+  fetch("/api/save", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  })
+  .then(r => r.json())
+  .then(() => { currentData[ean] = payload; })
+  .catch(() => alert("Inline save failed"));
+}
+
+/* Fill edit form */
+function fillEditForm(ean, info) {
+  document.getElementById("edit-ean").value = ean;
+  document.getElementById("edit-title").value = info.title || "";
+  document.getElementById("edit-location").value = info.location || "";
+  document.getElementById("edit-dv").checked = !!info.dv;
+  document.getElementById("edit-atmos").checked = !!info.atmos;
+  document.getElementById("edit-duration").value = info.duration || "";
+}
+
+/* Save edit */
+function saveEdit() {
+  const ean = document.getElementById("edit-ean").value;
+  const payload = {
+    ean: ean,
+    title: document.getElementById("edit-title").value,
+    location: document.getElementById("edit-location").value,
+    dv: document.getElementById("edit-dv").checked,
+    atmos: document.getElementById("edit-atmos").checked,
+    duration: document.getElementById("edit-duration").value
+  };
+
+  fetch("/api/save", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  })
+  .then(r => r.json())
+  .then(() => { alert("Saved"); reloadData(); })
+  .catch(() => alert("Save failed"));
+}
+
+/* Delete movie */
+function deleteMovie() {
+  const ean = document.getElementById("edit-ean").value;
+  if (!ean) return alert("No EAN selected");
+  if (!confirm("Delete this movie?")) return;
+
+  fetch("/api/delete/" + encodeURIComponent(ean), { method: "DELETE" })
+    .then(r => r.json())
+    .then(() => { alert("Deleted"); reloadData(); })
+    .catch(() => alert("Delete failed"));
+}
+
+/* Show add form */
+function showAddForm() {
+  document.getElementById("add-block").style.display = "block";
+}
+
+/* Add movie */
+function addMovie() {
+  const payload = {
+    ean: document.getElementById("add-ean").value,
+    title: document.getElementById("add-title").value,
+    location: document.getElementById("add-location").value,
+    dv: document.getElementById("add-dv").checked,
+    atmos: document.getElementById("add-atmos").checked,
+    duration: document.getElementById("add-duration").value
+  };
+
+  fetch("/api/add", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.error) alert("Error: " + d.error);
+    else {
+      alert("Added");
+      document.getElementById("add-block").style.display = "none";
+      reloadData();
+    }
+  })
+  .catch(() => alert("Add failed"));
+}
+
+/* CSV upload */
+function triggerCsvUpload() {
+  document.getElementById("csv-file").click();
+}
+
+/* Import CSV */
+function importCsv() {
+  const fileInput = document.getElementById("csv-file");
+  if (!fileInput.files.length) return alert("Select a CSV file first");
+
+  const formData = new FormData();
+  formData.append("file", fileInput.files[0]);
+
+  fetch("/api/import_csv", { method: "POST", body: formData })
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) alert("Import failed: " + d.error);
+      else {
+        alert(`Import completed\nAdded: ${d.added}\nIgnored: ${d.ignored}\nErrors: ${d.errors}`);
+        reloadData();
+      }
+    })
+    .catch(() => alert("Import failed"));
+}
+
+/* Export to scripts JSON */
+function exportToScripts() {
+  fetch("/api/export", { method: "POST" })
+    .then(r => r.json())
+    .then(() => alert("Exported to /bluray/locations.json"))
+    .catch(() => alert("Export failed"));
+}
+
+/* Export Excel */
+function exportExcel() {
+  let csv = "EAN,Title,Location,DV,Atmos,Duration\n";
+  Object.keys(currentData).forEach(ean => {
+    const m = currentData[ean];
+    csv += `="${ean}","${m.title}","${m.location}",${m.dv},${m.atmos},${m.duration || ""}\n`;
+/*  csv += `${ean},"${m.title}","${m.location}",${m.dv},${m.atmos},${m.duration || ""}\n`; */
+  });
+
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "bluray_catalog.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* Show logs */
+function showLogs(title, stdout, stderr) {
+  const log = document.getElementById("log-output");
+  let text = `=== ${title} ===\n\n`;
+  if (stdout?.trim()) text += `--- STDOUT ---\n${stdout}\n\n`;
+  if (stderr?.trim()) text += `--- STDERR ---\n${stderr}\n\n`;
+  log.textContent = text;
+  log.scrollTop = log.scrollHeight;
+}
+
+/* Run TMDB Resolver */
+function runTmdbResolver() {
+  fetch("/api/run_tmdb_resolver", { method: "POST" })
+    .then(r => r.json())
+    .then(d => {
+      alert("TMDB Resolver finished (return code: " + d.returncode + ")");
+      showLogs("TMDB Resolver", d.stdout, d.stderr);
+    })
+    .catch(() => alert("TMDB Resolver failed"));
+}
+
+/* Run Movies Alpha */
+function runMoviesAlpha() {
+  fetch("/api/run_movies_alpha", { method: "POST" })
+    .then(r => r.json())
+    .then(d => {
+      alert("movies_alpha finished (return code: " + d.returncode + ")");
+      showLogs("Movies Alpha", d.stdout, d.stderr);
+    })
+    .catch(() => alert("movies_alpha failed"));
+}
+
+/* Initial load */
+reloadData();
+</script>
+
+</body>
+</html>

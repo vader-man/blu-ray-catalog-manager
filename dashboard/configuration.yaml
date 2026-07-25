@@ -1,0 +1,33 @@
+template:
+  - sensor:
+     - name: "bluray_movies"
+        unique_id: bluray_movies_sensor
+        state: "{{ now() }}"
+        attributes:
+          movies: >
+            {{ state_attr('sensor.bluray_library', 'titles') }}
+            
+      - name: bluray_cards
+        unique_id: bluray_cards
+        state: "ok"
+        attributes:
+          cards: >
+            {% set movies = state_attr('sensor.bluray_filtered', 'titles') or [] %}
+            {% set out = [] %}
+            {% for m in movies %}
+              {% set e = "sensor.bluray_movie_" ~ loop.index %}
+              {% set card = {
+                "type": "custom:decluttering-card",
+                "template": "bluray_movie",
+                "variables": [{"entity": e}]
+              } %}
+              {% set out = out + [card] %}
+            {% endfor %}
+            {{ out }}
+
+      - name: "Movies Cards"
+        unique_id: movies_cards
+        state: "ok"
+        attributes:
+          cards: >
+            {{ state_attr('sensor.movies_alpha', 'movies') }}
