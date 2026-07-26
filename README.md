@@ -6,6 +6,10 @@ Blu‑ray Catalog Manager — Full Home Assistant integration for physical Blu�
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Integration-41BDF5.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Status](https://img.shields.io/badge/Status-Stable-success.svg)
+![GitHub stars](https://img.shields.io/github/stars/vader-man/blu-ray-catalog-manager.svg)
+![GitHub forks](https://img.shields.io/github/forks/vader-man/blu-ray-catalog-manager.svg)
+![GitHub issues](https://img.shields.io/github/issues/vader-man/blu-ray-catalog-manager.svg)
+![Last commit](https://img.shields.io/github/last-commit/vader-man/blu-ray-catalog-manager.svg)
 
 A complete system for managing physical **Blu-ray / 4K UHD collections** with full **Home Assistant integration**.  
 Includes a Flask backend, TMDB metadata pipeline, REST API, and a Lovelace dashboard with search, filters, sorting, and dynamic visuals.
