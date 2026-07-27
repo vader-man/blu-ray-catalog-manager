@@ -51,13 +51,13 @@ screenshots/    → Optional screenshots
 
 ## Documentation
 
-Toda la documentación está en la carpeta `docs/`:
+All documentation is located in the docs/ folder:
 
-- [INSTALL.md](docs/install.md) — instalación paso a paso  
-- [CONFIG.md](docs/configuration.md) — configuración del backend y HA  
-- [ARCHITECTURE.md](docs/architecture.md) — arquitectura del sistema  
-- [CONTRIBUTING.md](docs/contributing.md) — cómo colaborar  
-- [CHANGELOG.md](docs/changelog.md) — historial de cambios  
+- [INSTALL.md](docs/install.md) — step by step configuration  
+- [CONFIG.md](docs/configuration.md) — backend and HA configuration
+- [ARCHITECTURE.md](docs/architecture.md) — system architecture  
+- [CONTRIBUTING.md](docs/contributing.md) — how to collaborate 
+- [CHANGELOG.md](docs/changelog.md) — version history 
 
 ---
 
